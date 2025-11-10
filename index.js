@@ -33,50 +33,45 @@ async function run() {
 
     // PRODUCTS API's
     app.get("/products", async (req, res) => {
-      const result = await productsCollection.find().toArray();
+      const cursor = productsCollection.find();
+      const result = await cursor.toArray();
       console.log(result);
 
       res.send(result);
     });
 
+    // latest-products API
+    app.get("/latest-products", async (req, res) => {
+      const cursor = productsCollection
+        .find()
+        .sort({ created_at: -1 })
+        .limit(6);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
 
+    // product By ID
+    app.get("/products/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await productsCollection.findOne(query);
+      res.send(result);
+    });
 
+    // post/insert product by ID
+    app.post("/products", async (req, res) => {
+      const newProduct = req.body;
+      const result = await productsCollection.insertOne(newProduct);
+      res.send(result);
+    });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
+    // Delete Product By ID
+    app.delete("/products/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await productsCollection.deleteOne(query);
+      res.send(result);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
