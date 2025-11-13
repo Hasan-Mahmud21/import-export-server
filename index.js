@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 3000;
@@ -12,8 +13,10 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-const uri =
-  "mongodb+srv://importDB:HZhSdDAop9hgMcvn@cluster0.478fouv.mongodb.net/?appName=Cluster0";
+// const uri =
+// "mongodb+srv://importDB:HZhSdDAop9hgMcvn@cluster0.478fouv.mongodb.net/?appName=Cluster0";
+
+const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASS}@cluster0.478fouv.mongodb.net/?appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -106,7 +109,7 @@ async function run() {
 
         const importDoc = {
           user_email,
-          productId: pid,
+          productId: pid.toString(),
           product_name: product.product_name,
           product_image: product.product_image,
           price: product.price,
@@ -129,32 +132,38 @@ async function run() {
       }
     });
 
-    // GET: Fetch imports by user email
-app.get("/imports", async (req, res) => {
-  try {
-    const email = req.query.email;
+    // get imports by email
+    app.get("/imports", async (req, res) => {
+      try {
+        const email = req.query.email;
 
-    if (!email) {
-      return res.status(400).send({ error: "email query required" });
-    }
+        if (!email) {
+          return res.status(400).send({ error: "email query required" });
+        }
 
-    const imports = await importsCollection
-      .find({ user_email: email })
-      .toArray();
+        const imports = await importsCollection
+          .find({ user_email: email })
+          .toArray();
+        const convertId = imports.map((item) => ({
+          ...item,
+          productId:
+            item.productId && item.productId.toString
+              ? item.productId.toString()
+              : String(item.productId),
+        }));
 
-    res.send(imports);
-  } catch (error) {
-    console.error("GET_IMPORTS_ERROR:", error);
-    res.status(500).send({ error: "Failed to fetch imports" });
-  }
-});
-
+        res.send(convertId);
+      } catch (error) {
+        console.error(error);
+        res.send({ error: "Failed to fetch imports" });
+      }
+    });
 
     // Delete Product By ID
     app.delete("/imports/:id", async (req, res) => {
       const id = req.params.id;
       if (!ObjectId.isValid(id)) {
-        return res.status(400).send({ error: "Invalid import ID" });
+        return res.send({ error: "Invalid import ID" });
       }
 
       const result = await importsCollection.deleteOne({
