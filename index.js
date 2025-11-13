@@ -129,14 +129,85 @@ async function run() {
       }
     });
 
-    
+    // GET: Fetch imports by user email
+app.get("/imports", async (req, res) => {
+  try {
+    const email = req.query.email;
+
+    if (!email) {
+      return res.status(400).send({ error: "email query required" });
+    }
+
+    const imports = await importsCollection
+      .find({ user_email: email })
+      .toArray();
+
+    res.send(imports);
+  } catch (error) {
+    console.error("GET_IMPORTS_ERROR:", error);
+    res.status(500).send({ error: "Failed to fetch imports" });
+  }
+});
+
 
     // Delete Product By ID
-    app.delete("/products/:id", async (req, res) => {
+    app.delete("/imports/:id", async (req, res) => {
       const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await productsCollection.deleteOne(query);
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ error: "Invalid import ID" });
+      }
+
+      const result = await importsCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
       res.send(result);
+    });
+
+    // UPDATE product by ID
+    app.patch("/products/:id", async (req, res) => {
+      const id = req.params.id;
+
+      if (!ObjectId.isValid(id)) {
+        return res.send({ error: "Invalid product ID" });
+      }
+
+      const updates = req.body; // { product_name, product_image, price, ... }
+
+      const filter = { _id: new ObjectId(id) };
+
+      const updateDoc = {
+        $set: {
+          ...(updates.product_name && { product_name: updates.product_name }),
+          ...(updates.product_image && {
+            product_image: updates.product_image,
+          }),
+          ...(updates.price !== undefined && { price: Number(updates.price) }),
+          ...(updates.origin_country && {
+            origin_country: updates.origin_country,
+          }),
+          ...(updates.rating !== undefined && {
+            rating: Number(updates.rating),
+          }),
+          ...(updates.available_quantity !== undefined && {
+            available_quantity: Number(updates.available_quantity),
+          }),
+        },
+      };
+
+      try {
+        const result = await productsCollection.updateOne(filter, updateDoc);
+
+        if (result.modifiedCount === 0) {
+          return res.send({ error: "Product not found or no changes" });
+        }
+
+        res.send({
+          message: "Product updated successfully",
+        });
+      } catch (err) {
+        console.error("UPDATE_ERROR:", err);
+        res.send({ error: "Server error while updating product" });
+      }
     });
 
     // Send a ping to confirm a successful connection
