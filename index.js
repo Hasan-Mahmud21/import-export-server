@@ -30,7 +30,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     const db = client.db("importDB");
     const productsCollection = db.collection("products");
     const importsCollection = db.collection("imports");
@@ -159,17 +159,44 @@ async function run() {
       }
     });
 
-    // Delete Product By ID
+    // DELETE: remove a single import by its _id
     app.delete("/imports/:id", async (req, res) => {
       const id = req.params.id;
+
       if (!ObjectId.isValid(id)) {
-        return res.send({ error: "Invalid import ID" });
+        return res.status(400).send({ error: "Invalid import ID" });
       }
 
-      const result = await importsCollection.deleteOne({
-        _id: new ObjectId(id),
-      });
-      res.send(result);
+      try {
+        const result = await importsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        res.send({ deletedCount: result.deletedCount });
+      } catch (err) {
+        console.error("DELETE /imports/:id error:", err);
+        res.send({ error: "Server error while deleting import" });
+      }
+    });
+
+    // Delete Product By ID
+    app.delete("/products/:id", async (req, res) => {
+      const id = req.params.id;
+
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ error: "Invalid product ID" });
+      }
+
+      try {
+        const result = await productsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        res.send({ deletedCount: result.deletedCount });
+      } catch (err) {
+        console.error("DELETE /products/:id error:", err);
+        res.status(500).send({ error: "Server error while deleting product" });
+      }
     });
 
     // UPDATE product by ID
@@ -220,7 +247,7 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
