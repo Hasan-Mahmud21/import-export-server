@@ -30,6 +30,7 @@ async function run() {
     await client.connect();
     const db = client.db("importDB");
     const productsCollection = db.collection("products");
+    const importsCollection = db.collection("imports");
 
     // PRODUCTS API's
     app.get("/products", async (req, res) => {
@@ -53,8 +54,14 @@ async function run() {
     // product By ID
     app.get("/products/:id", async (req, res) => {
       const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await productsCollection.findOne(query);
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ error: "Invalid product ID" });
+      }
+      const result = await productsCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      if (!result) return res.status(404).send({ error: "Product not found" });
+
       res.send(result);
     });
 
@@ -64,6 +71,65 @@ async function run() {
       const result = await productsCollection.insertOne(newProduct);
       res.send(result);
     });
+
+    // POST: Import Now
+    app.post("/imports", async (req, res) => {
+      try {
+        const { product_id, quantity, user_email } = req.body;
+
+        // --- Validate incoming data ---
+        if (!product_id)
+          return res.status(400).send({ error: "product_id required" });
+
+        const qty = Number(quantity);
+        if (!qty || qty <= 0)
+          return res.send({ error: "Quantity must be a positive number" });
+
+        if (!user_email) return res.send({ error: "user_email required" });
+        const pid = ObjectId.isValid(product_id)
+          ? new ObjectId(product_id)
+          : product_id;
+
+        const product = await productsCollection.findOne({ _id: pid });
+
+        if (!product) {
+          return res.send({ error: "Product not found" });
+        }
+
+        if (product.available_quantity < qty) {
+          return res.send({ error: "Not enough stock available" });
+        }
+        await productsCollection.updateOne(
+          { _id: pid },
+          { $inc: { available_quantity: -qty } }
+        );
+
+        const importDoc = {
+          user_email,
+          productId: pid,
+          product_name: product.product_name,
+          product_image: product.product_image,
+          price: product.price,
+          rating: product.rating,
+          origin_country: product.origin_country,
+          import_quantity: qty,
+          date: new Date(),
+        };
+
+        const result = await importsCollection.insertOne(importDoc);
+
+        res.send({
+          success: true,
+          insertedId: result.insertedId,
+          new_stock: product.available_quantity - qty,
+        });
+      } catch (err) {
+        console.error("IMPORT_ERROR:", err);
+        res.send({ error: "Server error during import" });
+      }
+    });
+
+    
 
     // Delete Product By ID
     app.delete("/products/:id", async (req, res) => {
